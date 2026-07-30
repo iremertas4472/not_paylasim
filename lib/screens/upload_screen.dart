@@ -1,3 +1,4 @@
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/api_service.dart';
@@ -13,15 +14,18 @@ class _UploadScreenState extends State<UploadScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final List<String> _universiteler = [
-    'Selçuk Üniversitesi',
-    'Gıda Tarım Üniversitesi',
+    'Selcuk Universitesi',
+    'Gida Tarim Universitesi',
+    'Aksaray Üniversitesi',
+    'Konya Teknik Üniversitesi',
+    'Necmettin Erbakan Üniversitesi',
   ];
 
-  final List<String> _programTurleri = ['Önlisans', 'Lisans'];
+  final List<String> _programTurleri = ['Onlisans', 'Lisans'];
 
   final Map<String, List<String>> _sinifSecenekleri = {
-    'Önlisans': ['1', '2'],
-    'Lisans': ['Hazırlık', '1', '2', '3', '4'],
+    'Onlisans': ['1', '2'],
+    'Lisans': ['Hazirlik', '1', '2', '3', '4'],
   };
 
   String? _selectedUniversite;
@@ -55,7 +59,7 @@ class _UploadScreenState extends State<UploadScreen> {
         });
       }
     } catch (e) {
-      _hataGoster('Dosya seçilirken bir hata oluştu: $e');
+      _hataGoster('Dosya secilirken bir hata olustu: $e');
     }
   }
 
@@ -75,23 +79,20 @@ class _UploadScreenState extends State<UploadScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_secilenDosya == null) {
-      _hataGoster('Lütfen bir dosya seçin.');
+      _hataGoster('Lutfen bir dosya secin.');
       return;
     }
 
     setState(() => _yukleniyor = true);
 
     try {
-      // TODO: Şu an sadece dosya adı kaydediliyor. Gerçek dosya yükleme
-      // (bulut depolama vb.) sonraki adımda eklenecek.
       await ApiService.createNote(
-        baslik: _baslikController.text.trim(),
-        aciklama: _aciklamaController.text.trim(),
-        dersAdi: _dersAdiController.text.trim(),
-        dosyaAdi: _secilenDosya!.name,
-      );
-
-      _basariGoster('Not başarıyla yüklendi!');
+  baslik: _baslikController.text.trim(),
+  aciklama: _aciklamaController.text.trim(),
+  dersAdi: _dersAdiController.text.trim(),
+  dosya: File(_secilenDosya!.path!),
+);
+      _basariGoster('Not basariyla yuklendi!');
 
       setState(() {
         _selectedUniversite = null;
@@ -103,7 +104,7 @@ class _UploadScreenState extends State<UploadScreen> {
         _secilenDosya = null;
       });
     } catch (e) {
-      _hataGoster('Yükleme sırasında bir hata oluştu: $e');
+      _hataGoster('Yukleme sirasinda bir hata olustu: $e');
     } finally {
       setState(() => _yukleniyor = false);
     }
@@ -141,7 +142,7 @@ class _UploadScreenState extends State<UploadScreen> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'Not Yükle',
+          'Not Yukle',
           style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
@@ -153,6 +154,120 @@ class _UploadScreenState extends State<UploadScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               const SizedBox(height: 10),
-
-              //
-              
+              DropdownButtonFormField<String>(
+                initialValue: _selectedUniversite,
+                decoration: _inputDecoration('Universite secin', Icons.school),
+                items: _universiteler
+                    .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedUniversite = value);
+                },
+                validator: (value) =>
+                    value == null ? 'Lutfen universite secin' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedProgramTuru,
+                decoration:
+                    _inputDecoration('Program turu secin', Icons.category),
+                items: _programTurleri
+                    .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedProgramTuru = value;
+                    _selectedSinif = null;
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Lutfen program turu secin' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedSinif,
+                decoration: _inputDecoration('Sinif secin', Icons.class_),
+                items: (_selectedProgramTuru == null
+                        ? <String>[]
+                        : _sinifSecenekleri[_selectedProgramTuru!] ?? [])
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (value) {
+                  setState(() => _selectedSinif = value);
+                },
+                validator: (value) =>
+                    value == null ? 'Lutfen sinif secin' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _dersAdiController,
+                decoration: _inputDecoration('Ders adi', Icons.menu_book),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Lutfen ders adi girin'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _baslikController,
+                decoration: _inputDecoration('Not basligi', Icons.title),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Lutfen bir baslik girin'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _aciklamaController,
+                maxLines: 3,
+                decoration: _inputDecoration('Aciklama', Icons.description),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Lutfen bir aciklama girin'
+                    : null,
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: _dosyaSec,
+                icon: const Icon(Icons.attach_file),
+                label: Text(
+                  _secilenDosya == null ? 'Dosya Sec' : _secilenDosya!.name,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.grey[400]!),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              ElevatedButton(
+                onPressed: _yukleniyor ? null : _notuYukle,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _yukleniyor
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Text(
+                        'Notu Yukle',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

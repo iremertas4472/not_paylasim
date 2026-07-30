@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import '../services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -11,38 +12,35 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // TODO: Backend hazır olunca bu değerler, giriş yapan kullanıcının
-  // gerçek verileriyle (API'den gelen) doldurulacak.
-  final TextEditingController _adSoyadController =
-      TextEditingController(text: 'Ahmet Yılmaz');
-  final TextEditingController _ogrenciNoController =
-      TextEditingController(text: '20231234');
-  final TextEditingController _universiteController =
-      TextEditingController(text: 'Selçuk Üniversitesi');
-
-  // Email değiştirilemez, sadece görüntülenir (hesap doğrulaması buna bağlı)
-  final String _email = 'ornek@ogr.selcuk.edu.tr';
+  late final TextEditingController _adSoyadController;
+  late final TextEditingController _ogrenciNoController;
+  late final TextEditingController _universiteController;
+  late final String _email;
 
   bool _duzenlemeModu = false;
 
-  // ---------------------------------------------------------
-  // Notlarım bölümü için state ve mock veri
-  // TODO: Backend hazır olunca bu iki liste, giriş yapan kullanıcının
-  // gerçek "yüklediği notlar" (notes tablosunda user_id = kendisi olanlar)
-  // ve "kaydettiği notlar" (favoriler tablosundan) verisiyle doldurulacak.
-  // ---------------------------------------------------------
-  int _secilenSekme = 0; // 0: Yüklenenler, 1: Kaydedilenler
+  late Future<List<Map<String, dynamic>>> _notlarimFuture;
 
-  final List<Map<String, String>> _yuklenenNotlar = [
-    {'baslik': '1. Vize Özeti', 'ders': 'Matematik', 'tarih': '12.03.2026'},
-    {'baslik': 'Ödev Çözümleri', 'ders': 'Fizik', 'tarih': '02.04.2026'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _adSoyadController =
+        TextEditingController(text: ApiService.currentUserAdSoyad ?? '');
+    _ogrenciNoController =
+        TextEditingController(text: ApiService.currentUserStudentNo ?? '');
+    _universiteController =
+        TextEditingController(text: ApiService.currentUserUniversite ?? '');
+    _email = ApiService.currentUserEmail ?? '';
 
-  final List<Map<String, String>> _kaydedilenNotlar = [
-    {'baslik': 'Final Konu Tekrarı', 'ders': 'Kimya', 'yukleyen': 'Elif K.'},
-    {'baslik': 'Ders Notları - Hafta 3', 'ders': 'Biyoloji', 'yukleyen': 'Mert S.'},
-    {'baslik': 'Lab Raporu Örneği', 'ders': 'Fizik', 'yukleyen': 'Zeynep A.'},
-  ];
+    _notlarimFuture = _kendiNotlariniGetir();
+  }
+
+  Future<List<Map<String, dynamic>>> _kendiNotlariniGetir() async {
+    final tumNotlar = await ApiService.getNotes();
+    return tumNotlar
+        .where((not) => not['user_id'] == ApiService.currentUserId)
+        .toList();
+  }
 
   @override
   void dispose() {
@@ -54,8 +52,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _kaydet() {
     if (_formKey.currentState!.validate()) {
-      // TODO: Backend hazır olunca burada gerçek bir güncelleme isteği
-      // (PUT/PATCH) gönderilecek.
+      // TODO: Backend'de bir PUT/PATCH endpoint'i eklenince
+      // burada gerçek bir güncelleme isteği gönderilecek.
       setState(() {
         _duzenlemeModu = false;
       });
@@ -73,62 +71,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Notlarım bölümündeki sekme geçiş butonu
-  Widget _sekmeButonu(String baslik, int index) {
-    final secili = _secilenSekme == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _secilenSekme = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: secili ? Colors.deepPurple : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: secili ? Colors.deepPurple : Colors.grey[400]!,
-            ),
-          ),
-          child: Text(
-            baslik,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: secili ? Colors.white : Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Not listesini gösteren kart yapısı
-  Widget _notKarti(Map<String, String> not, {required bool yuklenen}) {
+  Widget _notKarti(Map<String, dynamic> not) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        leading: Icon(
-          yuklenen ? Icons.upload_file : Icons.bookmark,
-          color: Colors.deepPurple,
-        ),
-        title: Text(not['baslik'] ?? ''),
+        leading: const Icon(Icons.upload_file, color: Colors.deepPurple),
+        title: Text(not['baslik']?.toString() ?? ''),
         subtitle: Text(
-          yuklenen
-              ? '${not['ders']} • ${not['tarih']}'
-              : '${not['ders']} • ${not['yukleyen']}',
+          '${not['ders_adi'] ?? ''} • ${not['yukleme_tarihi']?.toString().split('T').first ?? ''}',
         ),
         trailing: const Icon(Icons.chevron_right, size: 20),
-        onTap: () {
-          // TODO: Not detay ekranı hazır olunca buraya yönlendirme eklenecek.
-        },
       ),
     );
   }
 
   Widget _notlarimBolumu() {
-    final gosterilecekListe =
-        _secilenSekme == 0 ? _yuklenenNotlar : _kaydedilenNotlar;
-    final yuklenenMi = _secilenSekme == 0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -136,30 +93,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Notlarım',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _sekmeButonu('Yüklenenler', 0),
-            const SizedBox(width: 8),
-            _sekmeButonu('Kaydedilenler', 1),
-          ],
-        ),
         const SizedBox(height: 16),
-        if (gosterilecekListe.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text(
-                yuklenenMi
-                    ? 'Henüz bir not yüklemedin.'
-                    : 'Henüz kaydedilen bir not yok.',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ),
-          )
-        else
-          ...gosterilecekListe
-              .map((not) => _notKarti(not, yuklenen: yuklenenMi)),
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: _notlarimFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Notlar yüklenemedi: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              );
+            }
+            final notlar = snapshot.data ?? [];
+            if (notlar.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Henüz bir not yüklemedin.',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+              );
+            }
+            return Column(
+              children: notlar.map((not) => _notKarti(not)).toList(),
+            );
+          },
+        ),
       ],
     );
   }
@@ -197,8 +168,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Icon(Icons.person, size: 56),
                   ),
                   const SizedBox(height: 24),
-
-                  // Ad Soyad
                   TextFormField(
                     controller: _adSoyadController,
                     enabled: _duzenlemeModu,
@@ -215,8 +184,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-
-                  // Email (salt okunur)
                   TextFormField(
                     initialValue: _email,
                     enabled: false,
@@ -227,8 +194,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Öğrenci No
                   TextFormField(
                     controller: _ogrenciNoController,
                     enabled: _duzenlemeModu,
@@ -246,8 +211,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-
-                  // Üniversite
                   TextFormField(
                     controller: _universiteController,
                     enabled: _duzenlemeModu,
@@ -264,7 +227,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-
                   if (_duzenlemeModu)
                     ElevatedButton.icon(
                       onPressed: _kaydet,
@@ -274,9 +236,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                     ),
-
                   const SizedBox(height: 32),
-
                   OutlinedButton.icon(
                     onPressed: _cikisYap,
                     icon: const Icon(Icons.logout, color: Colors.red),
@@ -292,11 +252,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),
-
             _notlarimBolumu(),
           ],
         ),

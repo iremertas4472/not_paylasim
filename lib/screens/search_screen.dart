@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -12,6 +12,9 @@ class _SearchScreenState extends State<SearchScreen> {
   final List<String> _universiteler = [
     'Selçuk Üniversitesi',
     'Gıda Tarım Üniversitesi',
+    'Aksaray Üniversitesi',
+    'Konya Teknik Üniversitesi',
+    'Necmettin Erbakan Üniversitesi',
   ];
 
   final List<String> _programTurleri = ['Önlisans', 'Lisans'];
@@ -60,6 +63,25 @@ class _SearchScreenState extends State<SearchScreen> {
         _hataMesaji = 'Notlar yüklenirken bir hata oluştu: $e';
         _yukleniyor = false;
       });
+    }
+  }
+  Future<void> _notuAc(String? pdfUrl) async {
+    if (pdfUrl == null || pdfUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bu nota ait dosya bulunamadı.')),
+      );
+      return;
+    }
+
+    final tamUrl = '${ApiService.baseUrl}$pdfUrl';
+    final uri = Uri.parse(tamUrl);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dosya açılamadı.')),
+      );
     }
   }
 
@@ -208,7 +230,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     subtitle: Text(
                                       '${not['ders_adi'] ?? ''} • ${not['ad_soyad'] ?? ''}',
                                     ),
-                                  ),
+                                  onTap: () => _notuAc(not['pdf_url']),),
                                 );
                               },
                             ),
